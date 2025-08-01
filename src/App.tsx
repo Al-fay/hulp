@@ -25,7 +25,7 @@ function App() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-50">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-500">
       <div className="w-full max-w-md bg-white rounded-md shadow-md p-4 flex flex-col gap-4">
         <div className="flex flex-col space-y-2 max-h-96 overflow-y-auto border rounded p-2 bg-gray-100">
           {messages.map((msg, i) => (
