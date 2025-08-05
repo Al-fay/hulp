@@ -1,43 +1,102 @@
-import { useState } from "react";
-import { Button } from "./components/ui/button.tsx";
-import { Textarea } from "./components/ui/textarea.tsx";
+import { useState, useEffect, useRef } from "react";
+import { Button } from "./components/ui/button";
+import { Textarea } from "./components/ui/textarea";
+
+// Fungsi untuk membersihkan format markdown
+function cleanMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1") // **bold**
+    .replace(/__(.*?)__/g, "$1") // __bold__
+    .replace(/\*(.*?)\*/g, "$1") // *italic*
+    .replace(/_(.*?)_/g, "$1") // _italic_
+    .replace(/^#+\s*(.*)$/gm, "$1") // heading
+    .replace(/^- (.*)$/gm, "$1") // list
+    .replace(/\n{2,}/g, "\n\n") // normalize newlines
+    .trim();
+}
 
 function App() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<{ from: "user" | "ai"; text: string }[]>([]);
+  const [messages, setMessages] = useState<
+    { from: "user" | "ai"; text: string }[]
+  >([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
 
-    // Tambah pesan user
-    setMessages((prev) => [...prev, { from: "user", text: input }]);
-    
-    // Clear input
+    const userMessage = input;
+    setMessages((prev) => [...prev, { from: "user", text: userMessage }]);
     setInput("");
+    setIsLoading(true);
 
-    // Simulasi balasan AI (kamu bisa ganti ini dengan call API)
-    setTimeout(() => {
+    try {
+      const res = await fetch("http://localhost:3000/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: userMessage }),
+      });
+
+      const data = await res.json();
+
+      const cleanResponse = cleanMarkdown(data.response);
+
       setMessages((prev) => [
         ...prev,
-        { from: "ai", text: "Ini balasan AI untuk: " + input }
+        {
+          from: "ai",
+          text: cleanResponse,
+          // pakai ini untuk mengetahui model yang menjawab
+          // text:
+          //   cleanResponse +
+          //   (data.modelUsed ? `\n\n(Model: ${data.modelUsed})` : ""),
+        },
       ]);
-    }, 1000);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        { from: "ai", text: "Terjadi kesalahan saat mengambil respons." },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-500">
-      <div className="w-full max-w-md bg-white rounded-md shadow-md p-4 flex flex-col gap-4">
-        <div className="flex flex-col space-y-2 max-h-96 overflow-y-auto border rounded p-2 bg-gray-100">
+    <div className="flex flex-col justify-between min-h-screen p-4 bg-gray-500">
+      <div className="flex-1 overflow-y-auto flex flex-col items-center">
+        {/* Header atau elemen tambahan bisa ditambahkan di sini */}
+      </div>
+
+      <div className="w-5xl mx-auto bg-lime-100 rounded-md shadow-2xl p-4 flex flex-col gap-4">
+        <div className="flex flex-col space-y-2 max-h-[400px] overflow-y-auto border rounded p-2 bg-gray-100">
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`p-2 rounded ${
-                msg.from === "user" ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-gray-900 self-start"
+              className={`p-2 rounded break-words whitespace-pre-wrap ${
+                msg.from === "user"
+                  ? "bg-blue-500 text-white self-end text-justify"
+                  : "bg-gray-300 text-gray-900 self-start text-justify"
               } max-w-[80%]`}
             >
               {msg.text}
             </div>
           ))}
+
+          {isLoading && (
+            <div className="bg-gray-300 text-gray-900 self-start p-2 rounded max-w-[80%] animate-pulse">
+              Memproses...
+            </div>
+          )}
+
+          <div ref={bottomRef} />
         </div>
 
         <Textarea
@@ -46,6 +105,7 @@ function App() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ketik pesan..."
+          disabled={isLoading}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -54,8 +114,8 @@ function App() {
           }}
         />
 
-        <Button onClick={handleSend} disabled={!input.trim()}>
-          Kirim
+        <Button onClick={handleSend} disabled={!input.trim() || isLoading}>
+          {isLoading ? "Menunggu..." : "Kirim"}
         </Button>
       </div>
     </div>
